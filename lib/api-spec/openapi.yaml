@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: terminal
+    description: Terminal operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,19 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /terminal/info:
+    get:
+      operationId: getTerminalInfo
+      tags: [terminal]
+      summary: Get terminal info
+      description: Returns info about the terminal environment
+      responses:
+        "200":
+          description: Terminal info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TerminalInfo"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +48,18 @@ components:
           type: string
       required:
         - status
-
+    TerminalInfo:
+      type: object
+      properties:
+        wsUrl:
+          type: string
+          description: WebSocket URL for terminal connection
+        tool:
+          type: string
+          description: Name of the pre-installed tool
+        description:
+          type: string
+      required:
+        - wsUrl
+        - tool
+        - description

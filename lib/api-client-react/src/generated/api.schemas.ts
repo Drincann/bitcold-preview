@@ -8,3 +8,11 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface TerminalInfo {
+  /** WebSocket URL for terminal connection */
+  wsUrl: string;
+  /** Name of the pre-installed tool */
+  tool: string;
+  description: string;
+}

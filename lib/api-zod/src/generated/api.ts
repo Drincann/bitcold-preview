@@ -14,3 +14,13 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Returns info about the terminal environment
+ * @summary Get terminal info
+ */
+export const GetTerminalInfoResponse = zod.object({
+  wsUrl: zod.string().describe("WebSocket URL for terminal connection"),
+  tool: zod.string().describe("Name of the pre-installed tool"),
+  description: zod.string(),
+});

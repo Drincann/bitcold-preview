@@ -13,7 +13,7 @@ import type {
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type { HealthStatus, TerminalInfo } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
 import type { ErrorType } from "../custom-fetch";
@@ -92,6 +92,82 @@ export function useHealthCheck<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getHealthCheckQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * Returns info about the terminal environment
+ * @summary Get terminal info
+ */
+export const getGetTerminalInfoUrl = () => {
+  return `/api/terminal/info`;
+};
+
+export const getTerminalInfo = async (
+  options?: RequestInit,
+): Promise<TerminalInfo> => {
+  return customFetch<TerminalInfo>(getGetTerminalInfoUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetTerminalInfoQueryKey = () => {
+  return [`/api/terminal/info`] as const;
+};
+
+export const getGetTerminalInfoQueryOptions = <
+  TData = Awaited<ReturnType<typeof getTerminalInfo>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTerminalInfo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetTerminalInfoQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getTerminalInfo>>> = ({
+    signal,
+  }) => getTerminalInfo({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getTerminalInfo>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetTerminalInfoQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getTerminalInfo>>
+>;
+export type GetTerminalInfoQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get terminal info
+ */
+
+export function useGetTerminalInfo<
+  TData = Awaited<ReturnType<typeof getTerminalInfo>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getTerminalInfo>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTerminalInfoQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

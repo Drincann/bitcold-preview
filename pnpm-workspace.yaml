@@ -71,6 +71,7 @@ onlyBuiltDependencies:
   - '@swc/core'
   - esbuild
   - msw
+  - node-pty
   - unrs-resolver
 
 overrides:
