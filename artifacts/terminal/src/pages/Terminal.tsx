@@ -18,6 +18,7 @@ function makeLocalEcho(term: Terminal, sendLine: (line: string) => void) {
     const code = data.charCodeAt(0);
 
     if (data === "\r") {
+      if (buffer.trim() === "") return;
       term.write("\r\n");
       sendLine(buffer + "\n");
       buffer = "";
