@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
  * Incremental GitHub push via API.
- * Usage: node scripts/github-push.js [commit message]
+ * Only uploads files whose content has changed (compares git blob SHA).
+ * Usage: node scripts/github-push.cjs [commit message]
  */
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const crypto = require('crypto');
 
 const TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = 'Drincann';
@@ -18,9 +20,14 @@ if (!TOKEN) { console.error('GITHUB_TOKEN not set'); process.exit(1); }
 const IGNORE_DIRS = new Set(['node_modules', '.git', '.local', 'dist', '.cache']);
 const IGNORE_EXTS = new Set(['.map', '.log']);
 const MAX_SIZE = 1.5 * 1024 * 1024;
-const SLEEP_MS = 300;
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function gitBlobSha(content) {
+  // Git blob SHA: sha1("blob <size>\0<content>")
+  const header = Buffer.from(`blob ${content.length}\0`);
+  return crypto.createHash('sha1').update(Buffer.concat([header, content])).digest('hex');
+}
 
 function api(method, apiPath, body, retries = 4) {
   return new Promise((resolve, reject) => {
@@ -42,7 +49,7 @@ function api(method, apiPath, body, retries = 4) {
         res.on('data', c => raw += c);
         res.on('end', () => {
           if (res.statusCode === 429 || res.statusCode === 403) {
-            if (n > 1) { return setTimeout(() => attempt(n - 1), 3000); }
+            if (n > 1) return setTimeout(() => attempt(n - 1), 3000);
           }
           if (res.statusCode >= 400) return reject(new Error(`${res.statusCode}: ${raw.slice(0, 300)}`));
           resolve(JSON.parse(raw));
@@ -68,7 +75,7 @@ function walkFiles(dir, rel = '') {
       if (IGNORE_EXTS.has(path.extname(e.name))) continue;
       const stat = fs.statSync(full);
       if (stat.size > MAX_SIZE) { console.log(`  skip large: ${rp}`); continue; }
-      out.push({ rp, full, mtime: stat.mtimeMs });
+      out.push({ rp, full });
     }
   }
   return out;
@@ -86,7 +93,6 @@ async function getRemoteTree(treeSha) {
 async function main() {
   const msg = process.argv[2] || 'chore: sync from replit';
 
-  // Get current HEAD
   const ref = await api('GET', `/repos/${OWNER}/${REPO}/git/refs/heads/${BRANCH}`);
   const headSha = ref.object.sha;
   const commitData = await api('GET', `/repos/${OWNER}/${REPO}/git/commits/${headSha}`);
@@ -97,36 +103,56 @@ async function main() {
   const remote = await getRemoteTree(baseTreeSha);
 
   const allFiles = walkFiles(BASE);
-  console.log(`Local files: ${allFiles.length}`);
+  const localPaths = new Set(allFiles.map(f => f.rp));
 
-  // Find changed files (by content hash comparison would be ideal, but we push all since we can't easily compare)
-  // For simplicity: push all files sequentially with small delay
-  const newItems = [];
-  let pushed = 0;
-
+  // Detect changed/new files by comparing git blob SHAs
+  const toUpload = [];
   for (const { rp, full } of allFiles) {
-    await sleep(SLEEP_MS);
+    const content = fs.readFileSync(full);
+    const localSha = gitBlobSha(content);
+    if (remote[rp] !== localSha) {
+      toUpload.push({ rp, full, content });
+    }
+  }
+
+  // Detect deleted files
+  const deleted = Object.keys(remote).filter(p => !localPaths.has(p));
+
+  console.log(`Changed: ${toUpload.length} | Deleted: ${deleted.length} | Unchanged: ${allFiles.length - toUpload.length}`);
+
+  if (toUpload.length === 0 && deleted.length === 0) {
+    console.log('Nothing to push.');
+    return;
+  }
+
+  // Upload only changed/new blobs
+  const newItems = [];
+  for (let i = 0; i < toUpload.length; i++) {
+    const { rp, content } = toUpload[i];
+    await sleep(200);
     try {
-      const content = fs.readFileSync(full);
       const blob = await api('POST', `/repos/${OWNER}/${REPO}/git/blobs`, {
         content: content.toString('base64'),
         encoding: 'base64',
       });
       newItems.push({ path: rp, mode: '100644', type: 'blob', sha: blob.sha });
-      pushed++;
-      process.stdout.write(`\r  uploading: ${pushed}/${allFiles.length}`);
+      process.stdout.write(`\r  uploading: ${i + 1}/${toUpload.length} — ${rp.slice(-50)}`);
     } catch (e) {
       console.log(`\n  skip ${rp}: ${e.message.slice(0, 80)}`);
     }
   }
+  if (toUpload.length > 0) console.log('');
 
-  console.log(`\nBuilding tree with ${newItems.length} files...`);
-  const tree = await api('POST', `/repos/${OWNER}/${REPO}/git/trees`, { tree: newItems });
-
-  if (tree.sha === baseTreeSha) {
-    console.log('No changes detected. Nothing to push.');
-    return;
+  // Mark deleted files (sha: null removes them from the tree)
+  for (const rp of deleted) {
+    newItems.push({ path: rp, mode: '100644', type: 'blob', sha: null });
   }
+
+  console.log('Building tree...');
+  const tree = await api('POST', `/repos/${OWNER}/${REPO}/git/trees`, {
+    base_tree: baseTreeSha,
+    tree: newItems,
+  });
 
   const commit = await api('POST', `/repos/${OWNER}/${REPO}/git/commits`, {
     message: msg,
@@ -139,7 +165,7 @@ async function main() {
     force: false,
   });
 
-  console.log(`Pushed! Commit: ${commit.sha.slice(0, 8)} — "${msg}"`);
+  console.log(`Pushed! ${commit.sha.slice(0, 8)} — "${msg}"`);
   console.log(`https://github.com/${OWNER}/${REPO}/commit/${commit.sha}`);
 }
 
