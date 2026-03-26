@@ -20,6 +20,7 @@ function writeSessionShell(sessionHome: string): string {
   const shellPath = path.join(sessionHome, ".shell");
   const lines = [
     "#!/bin/bash",
+    "stty -echo",
     `export HOME="${sessionHome}"`,
     `export BITCOLD_HOME="${sessionHome}/.bitcold"`,
     `cd "${sessionHome}"`,

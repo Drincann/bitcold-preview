@@ -4,6 +4,78 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import "@xterm/xterm/css/xterm.css";
 
+function makeLocalEcho(term: Terminal, sendLine: (line: string) => void) {
+  let buffer = "";
+  let cursorPos = 0;
+
+  function redrawFromCursor() {
+    const tail = buffer.slice(cursorPos);
+    term.write(tail + " ");
+    for (let i = 0; i < tail.length + 1; i++) term.write("\b");
+  }
+
+  function handleData(data: string) {
+    const code = data.charCodeAt(0);
+
+    if (data === "\r") {
+      term.write("\r\n");
+      sendLine(buffer + "\n");
+      buffer = "";
+      cursorPos = 0;
+    } else if (data === "\x7f" || data === "\b") {
+      if (cursorPos > 0) {
+        buffer = buffer.slice(0, cursorPos - 1) + buffer.slice(cursorPos);
+        cursorPos--;
+        term.write("\b");
+        redrawFromCursor();
+      }
+    } else if (data === "\x1b[3~") {
+      if (cursorPos < buffer.length) {
+        buffer = buffer.slice(0, cursorPos) + buffer.slice(cursorPos + 1);
+        redrawFromCursor();
+      }
+    } else if (data === "\x1b[C") {
+      if (cursorPos < buffer.length) {
+        cursorPos++;
+        term.write(data);
+      }
+    } else if (data === "\x1b[D") {
+      if (cursorPos > 0) {
+        cursorPos--;
+        term.write(data);
+      }
+    } else if (data === "\x1b[A" || data === "\x1b[B") {
+      // up/down arrows — no history, ignore
+    } else if (data === "\x1b[H" || data === "\x1b[1~") {
+      const steps = cursorPos;
+      cursorPos = 0;
+      for (let i = 0; i < steps; i++) term.write("\x1b[D");
+    } else if (data === "\x1b[F" || data === "\x1b[4~") {
+      const steps = buffer.length - cursorPos;
+      cursorPos = buffer.length;
+      for (let i = 0; i < steps; i++) term.write("\x1b[C");
+    } else if (data === "\x03") {
+      term.write("^C\r\n");
+      sendLine("\x03");
+      buffer = "";
+      cursorPos = 0;
+    } else if (data === "\x04") {
+      sendLine("\x04");
+    } else if (data === "\x0c") {
+      term.clear();
+    } else if (code >= 32 || code === 9) {
+      const head = buffer.slice(0, cursorPos);
+      const tail = buffer.slice(cursorPos);
+      buffer = head + data + tail;
+      cursorPos += data.length;
+      term.write(data + tail);
+      for (let i = 0; i < tail.length; i++) term.write("\b");
+    }
+  }
+
+  return { handleData };
+}
+
 export default function TerminalPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
@@ -14,6 +86,12 @@ export default function TerminalPage() {
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const ws = new WebSocket(`${protocol}//${window.location.host}/api/terminal`);
     wsRef.current = ws;
+
+    const echo = makeLocalEcho(term, (line) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "input", data: line }));
+      }
+    });
 
     ws.onopen = () => {
       term.clear();
@@ -27,7 +105,7 @@ export default function TerminalPage() {
         if (msg.type === "output") {
           term.write(msg.data);
         } else if (msg.type === "exit") {
-          term.writeln("\r\n\x1b[33m[Session ended. Refresh the page to start a new session.]\x1b[0m");
+          term.writeln("\r\n\x1b[33m[Session ended. Refresh to start a new session.]\x1b[0m");
         }
       } catch {
         term.write(event.data);
@@ -41,6 +119,8 @@ export default function TerminalPage() {
     ws.onerror = () => {
       term.writeln("\r\n\x1b[31m[Connection error]\x1b[0m");
     };
+
+    term.onData(echo.handleData);
   }, []);
 
   useEffect(() => {
@@ -93,12 +173,6 @@ export default function TerminalPage() {
     term.writeln("\x1b[90mConnecting...\x1b[0m\r\n");
 
     connect(term, fitAddon);
-
-    term.onData((data) => {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: "input", data }));
-      }
-    });
 
     const handleResize = () => {
       fitAddon.fit();
