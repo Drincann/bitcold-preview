@@ -114,7 +114,7 @@ export function setupTerminalWebSocket(server: Server) {
         TERM: "xterm-256color",
         COLORTERM: "truecolor",
         HOME: sessionHome,
-        PATH: `${path.dirname(BITCOLD_BIN)}:/usr/local/bin:/usr/bin:/bin`,
+        PATH: `${path.dirname(BITCOLD_BIN)}:${path.dirname(process.execPath)}:/usr/local/bin:/usr/bin:/bin`,
         LANG: process.env.LANG ?? "en_US.UTF-8",
         NODE_PATH: process.env.NODE_PATH ?? "",
       },
