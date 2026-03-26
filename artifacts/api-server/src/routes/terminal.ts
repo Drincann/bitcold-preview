@@ -3,6 +3,25 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server } from "http";
 import pty from "node-pty";
 import { logger } from "../lib/logger";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+
+function createSessionHome(): string {
+  const sessionId = crypto.randomUUID();
+  const sessionHome = path.join("/tmp", "sessions", sessionId);
+  fs.mkdirSync(sessionHome, { recursive: true });
+  return sessionHome;
+}
+
+function cleanupSessionHome(sessionHome: string) {
+  try {
+    fs.rmSync(sessionHome, { recursive: true, force: true });
+    logger.info({ sessionHome }, "Session home cleaned up");
+  } catch (err) {
+    logger.warn({ err, sessionHome }, "Failed to clean up session home");
+  }
+}
 
 export function setupTerminalWebSocket(server: Server) {
   const wss = new WebSocketServer({ noServer: true });
@@ -19,7 +38,8 @@ export function setupTerminalWebSocket(server: Server) {
   });
 
   wss.on("connection", (ws: WebSocket) => {
-    logger.info("Terminal WebSocket connected");
+    const sessionHome = createSessionHome();
+    logger.info({ sessionHome }, "Terminal WebSocket connected, session home created");
 
     const cols = 80;
     const rows = 24;
@@ -28,11 +48,13 @@ export function setupTerminalWebSocket(server: Server) {
       name: "xterm-256color",
       cols,
       rows,
-      cwd: process.env.HOME ?? "/tmp",
+      cwd: sessionHome,
       env: {
         ...process.env,
         TERM: "xterm-256color",
         COLORTERM: "truecolor",
+        HOME: sessionHome,
+        HISTFILE: path.join(sessionHome, ".bash_history"),
       },
     });
 
@@ -48,6 +70,7 @@ export function setupTerminalWebSocket(server: Server) {
         ws.send(JSON.stringify({ type: "exit", code: exitCode }));
         ws.close();
       }
+      cleanupSessionHome(sessionHome);
     });
 
     ws.on("message", (raw) => {
@@ -66,11 +89,13 @@ export function setupTerminalWebSocket(server: Server) {
     ws.on("close", () => {
       logger.info("Terminal WebSocket disconnected");
       shell.kill();
+      cleanupSessionHome(sessionHome);
     });
 
     ws.on("error", (err) => {
       logger.error({ err }, "Terminal WebSocket error");
       shell.kill();
+      cleanupSessionHome(sessionHome);
     });
   });
 
