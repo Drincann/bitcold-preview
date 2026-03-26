@@ -50,9 +50,24 @@ Every package extends `tsconfig.base.json` which sets `composite: true`. The roo
 
 ## Packages
 
+### `artifacts/terminal` (`@workspace/terminal`)
+
+React + Vite frontend for the bitcold cold wallet terminal. Renders an xterm.js terminal that connects via WebSocket to the API server.
+
+- Fullscreen `#1a1a1a` background; no header — designed for iframe embedding
+- Local echo with client-side character buffer (no latency from server round-trip)
+- Left/right cursor movement, backspace, and Ctrl+C handled client-side
+- Multiline `\` continuation support
+
 ### `artifacts/api-server` (`@workspace/api-server`)
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+Express 5 API server with a WebSocket endpoint at `/api/terminal` that powers the bitcold terminal.
+
+- **bitcold dependency**: `bitcold` is listed in `dependencies` (pinned to `0.4.1`). It is excluded from pnpm's minimum-release-age security check via `minimumReleaseAgeExclude` in `pnpm-workspace.yaml`, so new versions can be installed immediately after publishing.
+- **Binary resolution**: `resolveBitcoldBin()` in `src/routes/terminal.ts` first tries `node_modules/.bin/bitcold`, then falls back to `which bitcold` in `$PATH`.
+- **Per-session isolation**: each WebSocket connection gets a private `HOME` at `/tmp/sessions/<uuid>/`, cleaned up on disconnect.
+- **Restricted shell**: a custom bash script (written per-session to `$HOME/.shell`) only accepts `bitcold`, `clear`, `help`, and `exit` commands — no shell escape is possible.
+- Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
 
 - Entry: `src/index.ts` — reads `PORT`, starts Express
 - App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`

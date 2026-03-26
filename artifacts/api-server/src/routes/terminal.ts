@@ -7,7 +7,30 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-const BITCOLD_BIN = "/home/runner/workspace/.config/npm/node_global/bin/bitcold";
+import { execSync } from "child_process";
+import { fileURLToPath } from "url";
+
+function resolveBitcoldBin(): string {
+  const candidates = [
+    path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../node_modules/.bin/bitcold"
+    ),
+  ];
+  for (const p of candidates) {
+    try {
+      fs.accessSync(p, fs.constants.X_OK);
+      return p;
+    } catch {}
+  }
+  try {
+    return execSync("which bitcold", { encoding: "utf8" }).trim();
+  } catch {}
+  return "bitcold";
+}
+
+const BITCOLD_BIN = resolveBitcoldBin();
+logger.info({ BITCOLD_BIN }, "Resolved bitcold binary");
 
 function createSessionHome(): string {
   const sessionId = crypto.randomUUID();
