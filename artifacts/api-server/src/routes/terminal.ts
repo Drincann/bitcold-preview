@@ -14,6 +14,88 @@ function createSessionHome(): string {
   return sessionHome;
 }
 
+function writeSessionRcFile(sessionHome: string): string {
+  const rcFile = path.join(sessionHome, ".session_bashrc");
+  const content = `
+# Sandboxed session environment
+export SESSION_HOME="${sessionHome}"
+export HOME="${sessionHome}"
+export HISTFILE="${sessionHome}/.bash_history"
+export PS1='\\[\\033[1;32m\\][sandbox]\\[\\033[0m\\] \\[\\033[1;34m\\]\\w\\[\\033[0m\\]\\$ '
+
+cd "${sessionHome}"
+
+# Block dangerous commands that affect the host system
+_deny() {
+  echo "bash: \$1: not available in this environment" >&2
+  return 1
+}
+
+sudo()    { _deny sudo; }
+su()      { _deny su; }
+chmod()   {
+  for a in "\$@"; do
+    case "\$a" in -*) continue;; esac
+    local r
+    r=\$(realpath -m "\$a" 2>/dev/null || echo "\$a")
+    if [[ "\${r#\${SESSION_HOME}}" == "\$r" && "\$r" == /* ]]; then
+      echo "chmod: cannot change permissions outside sandbox: \$a" >&2
+      return 1
+    fi
+  done
+  command chmod "\$@"
+}
+chown()   { _deny chown; }
+dd()      { _deny dd; }
+mkfs()    { _deny mkfs; }
+fdisk()   { _deny fdisk; }
+shred()   { _deny shred; }
+mount()   { _deny mount; }
+umount()  { _deny umount; }
+sysctl()  { _deny sysctl; }
+insmod()  { _deny insmod; }
+rmmod()   { _deny rmmod; }
+iptables(){ _deny iptables; }
+useradd() { _deny useradd; }
+userdel() { _deny userdel; }
+passwd()  { _deny passwd; }
+
+rm() {
+  local -a fargs=()
+  local -a paths=()
+  local dashdash=false
+  for a in "\$@"; do
+    if \$dashdash; then
+      paths+=("\$a")
+    elif [[ "\$a" == "--" ]]; then
+      dashdash=true
+    elif [[ "\$a" == -* ]]; then
+      fargs+=("\$a")
+    else
+      paths+=("\$a")
+    fi
+  done
+  for p in "\${paths[@]}"; do
+    local r
+    r=\$(realpath -m "\$p" 2>/dev/null || echo "\$p")
+    if [[ "\${r#\${SESSION_HOME}}" == "\$r" && "\$r" == /* ]]; then
+      echo "rm: cannot remove '\$p': outside sandbox" >&2
+      return 1
+    fi
+    if [[ "\$r" == "\${SESSION_HOME}" ]]; then
+      echo "rm: cannot remove sandbox root '\$p'" >&2
+      return 1
+    fi
+  done
+  command rm "\${fargs[@]}" "\${paths[@]}"
+}
+
+export -f sudo su chmod chown dd mkfs fdisk shred mount umount sysctl insmod rmmod iptables useradd userdel passwd rm _deny
+`;
+  fs.writeFileSync(rcFile, content, { mode: 0o600 });
+  return rcFile;
+}
+
 function cleanupSessionHome(sessionHome: string) {
   try {
     fs.rmSync(sessionHome, { recursive: true, force: true });
@@ -39,12 +121,13 @@ export function setupTerminalWebSocket(server: Server) {
 
   wss.on("connection", (ws: WebSocket) => {
     const sessionHome = createSessionHome();
-    logger.info({ sessionHome }, "Terminal WebSocket connected, session home created");
+    const rcFile = writeSessionRcFile(sessionHome);
+    logger.info({ sessionHome }, "Terminal WebSocket connected, sandboxed session created");
 
     const cols = 80;
     const rows = 24;
 
-    const shell = pty.spawn("bash", [], {
+    const shell = pty.spawn("bash", ["--rcfile", rcFile], {
       name: "xterm-256color",
       cols,
       rows,
