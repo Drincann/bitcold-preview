@@ -35,7 +35,7 @@ function writeSessionShell(sessionHome: string): string {
     `printf "\${GRAY}Type 'bitcold help' to get started. Type 'exit' to quit.\${RESET}\\n\\n"`,
     "",
     "while true; do",
-    '  printf "${GREEN}bitcold>${RESET} "',
+    '  printf "${GREEN}~${RESET} ${CYAN}❯${RESET}  "',
     "",
     "  IFS= read -r line",
     "  [[ $? -ne 0 ]] && break",
