@@ -52,7 +52,7 @@ export default function TerminalPage() {
       fontSize: 14,
       lineHeight: 1.2,
       theme: {
-        background: "#0d1117",
+        background: "#1a1a1a",
         foreground: "#e6edf3",
         cursor: "#f0883e",
         selectionBackground: "#264f78",
@@ -123,36 +123,12 @@ export default function TerminalPage() {
       style={{
         width: "100vw",
         height: "100vh",
-        background: "#0d1117",
+        background: "#1a1a1a",
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
       }}
     >
-      <div
-        style={{
-          background: "#161b22",
-          borderBottom: "1px solid #30363d",
-          padding: "8px 16px",
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: "flex", gap: "6px" }}>
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
-        </div>
-        <span style={{ color: "#8b949e", fontSize: 13, marginLeft: 8, fontFamily: "monospace" }}>
-          bitcold terminal
-        </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <span style={{ color: "#3fb950", fontSize: 12 }}>● connected</span>
-        </div>
-      </div>
-
       <div
         ref={containerRef}
         style={{
