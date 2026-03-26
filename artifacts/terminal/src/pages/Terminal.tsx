@@ -19,7 +19,7 @@ function makeLocalEcho(term: Terminal, sendLine: (line: string) => void) {
 
     if (data === "\r") {
       if (buffer.trim() === "") return;
-      term.write("\r\n");
+      term.write("\r");
       sendLine(buffer + "\n");
       buffer = "";
       cursorPos = 0;
