@@ -170,12 +170,18 @@ function makeLocalEcho(
       historyIndex--;
       replaceBuffer(historyIndex === -1 ? savedBuffer : history[historyIndex]);
 
-    // ── Home / Ctrl+A ──────────────────────────────────────────────────────
-    } else if (data === "\x1b[H" || data === "\x1b[1~" || data === "\x01") {
+    // ── Home / Ctrl+A / Cmd+Left ───────────────────────────────────────────
+    } else if (
+      data === "\x1b[H"    || data === "\x1b[1~" ||
+      data === "\x01"      || data === "\x1b[1;9D"
+    ) {
       moveCursorTo(0);
 
-    // ── End / Ctrl+E ───────────────────────────────────────────────────────
-    } else if (data === "\x1b[F" || data === "\x1b[4~" || data === "\x05") {
+    // ── End / Ctrl+E / Cmd+Right ───────────────────────────────────────────
+    } else if (
+      data === "\x1b[F"    || data === "\x1b[4~" ||
+      data === "\x05"      || data === "\x1b[1;9C"
+    ) {
       moveCursorTo(buffer.length);
 
     // ── Ctrl+K: kill to end of line ────────────────────────────────────────
