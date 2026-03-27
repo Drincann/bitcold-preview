@@ -67,12 +67,18 @@ function makeLocalEcho(
   }
 
   function submitBuffer(forceNewline = false) {
-    if (buffer.trim() === "") return;
-    term.write(forceNewline || isAtShellPrompt() ? "\r\n" : "\r");
-    // Save non-duplicate entry to history
-    if (history[0] !== buffer) history.unshift(buffer);
-    historyIndex = -1;
-    savedBuffer = "";
+    const atPrompt = isAtShellPrompt();
+    // At the shell prompt, swallow empty Enter to avoid repeated prefix output.
+    // Inside a program (e.g. inquirer passphrase prompt), empty Enter is valid
+    // and must be forwarded so the user can confirm a blank value.
+    if (buffer.trim() === "" && atPrompt) return;
+    term.write(forceNewline || atPrompt ? "\r\n" : "\r");
+    // Only add non-empty lines to history
+    if (buffer.trim() !== "" && history[0] !== buffer) {
+      history.unshift(buffer);
+      historyIndex = -1;
+      savedBuffer = "";
+    }
     sendLine(buffer + "\n");
     buffer = "";
     cursorPos = 0;
@@ -114,7 +120,6 @@ function makeLocalEcho(
     }
 
     if (data === "\r") {
-      if (buffer.trim() === "") return;
       submitBuffer();
 
     // ── Backspace ──────────────────────────────────────────────────────────
