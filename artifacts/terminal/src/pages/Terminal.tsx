@@ -201,19 +201,23 @@ function makeLocalEcho(
     } else if (data === "\x17") {
       const target = wordLeft(cursorPos);
       const deleted = cursorPos - target;
-      buffer = buffer.slice(0, target) + buffer.slice(cursorPos);
+      const tail = buffer.slice(cursorPos);
+      buffer = buffer.slice(0, target) + tail;
       for (let i = 0; i < deleted; i++) term.write("\b");
       cursorPos = target;
-      redrawFromCursor();
+      term.write(tail + " ".repeat(deleted));
+      for (let i = 0; i < tail.length + deleted; i++) term.write("\b");
 
     // ── Alt+Backspace: delete word left (same as Ctrl+W) ───────────────────
     } else if (data === "\x1b\x7f") {
       const target = wordLeft(cursorPos);
       const deleted = cursorPos - target;
-      buffer = buffer.slice(0, target) + buffer.slice(cursorPos);
+      const tail = buffer.slice(cursorPos);
+      buffer = buffer.slice(0, target) + tail;
       for (let i = 0; i < deleted; i++) term.write("\b");
       cursorPos = target;
-      redrawFromCursor();
+      term.write(tail + " ".repeat(deleted));
+      for (let i = 0; i < tail.length + deleted; i++) term.write("\b");
 
     // ── Ctrl+C ─────────────────────────────────────────────────────────────
     } else if (data === "\x03") {
