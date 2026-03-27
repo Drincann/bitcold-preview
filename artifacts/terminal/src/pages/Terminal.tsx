@@ -253,7 +253,16 @@ function makeLocalEcho(
     }
   }
 
-  return { handleData };
+  // Erase the entire input line (used by Cmd+Backspace).
+  function killLine() {
+    for (let i = 0; i < cursorPos; i++) term.write("\b");
+    term.write(" ".repeat(buffer.length));
+    for (let i = 0; i < buffer.length; i++) term.write("\b");
+    buffer = "";
+    cursorPos = 0;
+  }
+
+  return { handleData, killLine };
 }
 
 export default function TerminalPage() {
@@ -314,6 +323,15 @@ export default function TerminalPage() {
     };
 
     term.onData(echo.handleData);
+
+    // Cmd+Backspace: erase entire input line (browser key event, not a VT sequence)
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === "keydown" && e.metaKey && e.key === "Backspace") {
+        echo.killLine();
+        return false;
+      }
+      return true;
+    });
   }, []);
 
   useEffect(() => {
