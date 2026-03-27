@@ -12,15 +12,67 @@ function makeLocalEcho(
   let buffer = "";
   let cursorPos = 0;
 
+  // Command history
+  const history: string[] = [];
+  let historyIndex = -1;
+  let savedBuffer = ""; // buffer saved when browsing history
+
   function redrawFromCursor() {
     const tail = buffer.slice(cursorPos);
     term.write(tail + " ");
     for (let i = 0; i < tail.length + 1; i++) term.write("\b");
   }
 
+  // Replace entire buffer contents and move cursor to end.
+  function replaceBuffer(newBuf: string) {
+    // Move to start of current buffer
+    for (let i = 0; i < cursorPos; i++) term.write("\b");
+    // Overwrite with new content, pad to erase old trailing chars
+    const pad = newBuf.length < buffer.length
+      ? " ".repeat(buffer.length - newBuf.length)
+      : "";
+    term.write(newBuf + pad);
+    // Move cursor back past the padding
+    for (let i = 0; i < pad.length; i++) term.write("\b");
+    buffer = newBuf;
+    cursorPos = newBuf.length;
+  }
+
+  // Move cursor to an absolute position within the buffer.
+  function moveCursorTo(newPos: number) {
+    newPos = Math.max(0, Math.min(buffer.length, newPos));
+    const diff = newPos - cursorPos;
+    if (diff > 0) {
+      for (let i = 0; i < diff; i++) term.write("\x1b[C");
+    } else if (diff < 0) {
+      for (let i = 0; i < -diff; i++) term.write("\x1b[D");
+    }
+    cursorPos = newPos;
+  }
+
+  // Find word boundary scanning left from pos.
+  function wordLeft(pos: number): number {
+    let i = pos;
+    while (i > 0 && buffer[i - 1] === " ") i--;
+    while (i > 0 && buffer[i - 1] !== " ") i--;
+    return i;
+  }
+
+  // Find word boundary scanning right from pos.
+  function wordRight(pos: number): number {
+    let i = pos;
+    while (i < buffer.length && buffer[i] === " ") i++;
+    while (i < buffer.length && buffer[i] !== " ") i++;
+    return i;
+  }
+
   function submitBuffer(forceNewline = false) {
     if (buffer.trim() === "") return;
     term.write(forceNewline || isAtShellPrompt() ? "\r\n" : "\r");
+    // Save non-duplicate entry to history
+    if (history[0] !== buffer) history.unshift(buffer);
+    historyIndex = -1;
+    savedBuffer = "";
     sendLine(buffer + "\n");
     buffer = "";
     cursorPos = 0;
@@ -30,12 +82,6 @@ function makeLocalEcho(
     const code = data.charCodeAt(0);
 
     // Paste: multiple characters arriving at once (not an escape sequence).
-    // Instead of submitting each line individually (which causes the shell to
-    // emit a continuation prompt ❯ for every \ line), we accumulate everything
-    // into the local buffer and display each line visually. Lines ending with \
-    // are joined (the \ is stripped) so the shell receives one complete command.
-    // The buffer is submitted only when the paste ends with a newline, or when
-    // the user presses Enter manually after pasting the last incomplete line.
     if (data.length > 1 && !data.startsWith("\x1b")) {
       const rawLines = data.split(/\r\n|\r|\n/);
       for (let i = 0; i < rawLines.length; i++) {
@@ -43,10 +89,7 @@ function makeLocalEcho(
         const isLast = i === rawLines.length - 1;
 
         if (seg.length > 0) {
-          // Echo the segment on screen.
           term.write(seg);
-          // Accumulate into buffer: strip trailing \ continuation marker so the
-          // shell receives a single flat command rather than per-line chunks.
           const stripped = seg.trimEnd();
           if (!isLast && stripped.endsWith("\\")) {
             buffer += stripped.slice(0, -1) + " ";
@@ -57,18 +100,13 @@ function makeLocalEcho(
         }
 
         if (!isLast) {
-          // There is a newline after this segment — advance the display line.
           term.write("\r\n");
-          // If this segment is a complete command (no \ continuation), submit it
-          // now and start a fresh buffer for the next command in the paste.
           if (!seg.trimEnd().endsWith("\\") && buffer.trim()) {
             submitBuffer(/* forceNewline */ true);
           }
         }
       }
 
-      // If the paste ended with a newline the last element is "" — submit whatever
-      // accumulated in the buffer as the final command.
       if (rawLines[rawLines.length - 1] === "" && buffer.trim()) {
         submitBuffer(/* forceNewline */ true);
       }
@@ -77,10 +115,9 @@ function makeLocalEcho(
 
     if (data === "\r") {
       if (buffer.trim() === "") return;
-      // At the shell prompt: keep the command visible, program output goes on
-      // the next line. Inside a program (e.g. inquirer password/confirm): use
-      // \r so the locally-echoed plaintext gets overwritten by the next prompt.
       submitBuffer();
+
+    // ── Backspace ──────────────────────────────────────────────────────────
     } else if (data === "\x7f" || data === "\b") {
       if (cursorPos > 0) {
         buffer = buffer.slice(0, cursorPos - 1) + buffer.slice(cursorPos);
@@ -88,40 +125,114 @@ function makeLocalEcho(
         term.write("\b");
         redrawFromCursor();
       }
+
+    // ── Delete ─────────────────────────────────────────────────────────────
     } else if (data === "\x1b[3~") {
       if (cursorPos < buffer.length) {
         buffer = buffer.slice(0, cursorPos) + buffer.slice(cursorPos + 1);
         redrawFromCursor();
       }
+
+    // ── Arrow right ────────────────────────────────────────────────────────
     } else if (data === "\x1b[C") {
-      if (cursorPos < buffer.length) {
-        cursorPos++;
-        term.write(data);
-      }
+      if (cursorPos < buffer.length) { cursorPos++; term.write(data); }
+
+    // ── Arrow left ─────────────────────────────────────────────────────────
     } else if (data === "\x1b[D") {
-      if (cursorPos > 0) {
-        cursorPos--;
-        term.write(data);
+      if (cursorPos > 0) { cursorPos--; term.write(data); }
+
+    // ── Word right: Ctrl+Right / Alt+Right (ESC f / ESC [1;5C / ESC [1;3C) ─
+    } else if (
+      data === "\x1b[1;5C" || data === "\x1b[1;3C" ||
+      data === "\x1bf"     || data === "\x1b\x1b[C"
+    ) {
+      moveCursorTo(wordRight(cursorPos));
+
+    // ── Word left: Ctrl+Left / Alt+Left (ESC b / ESC [1;5D / ESC [1;3D) ──
+    } else if (
+      data === "\x1b[1;5D" || data === "\x1b[1;3D" ||
+      data === "\x1bb"     || data === "\x1b\x1b[D"
+    ) {
+      moveCursorTo(wordLeft(cursorPos));
+
+    // ── History: Up ────────────────────────────────────────────────────────
+    } else if (data === "\x1b[A") {
+      if (history.length === 0) return;
+      if (historyIndex === -1) savedBuffer = buffer;
+      if (historyIndex < history.length - 1) {
+        historyIndex++;
+        replaceBuffer(history[historyIndex]);
       }
-    } else if (data === "\x1b[A" || data === "\x1b[B") {
-      // up/down arrows — no history, ignore
-    } else if (data === "\x1b[H" || data === "\x1b[1~") {
-      const steps = cursorPos;
+
+    // ── History: Down ──────────────────────────────────────────────────────
+    } else if (data === "\x1b[B") {
+      if (historyIndex === -1) return;
+      historyIndex--;
+      replaceBuffer(historyIndex === -1 ? savedBuffer : history[historyIndex]);
+
+    // ── Home / Ctrl+A ──────────────────────────────────────────────────────
+    } else if (data === "\x1b[H" || data === "\x1b[1~" || data === "\x01") {
+      moveCursorTo(0);
+
+    // ── End / Ctrl+E ───────────────────────────────────────────────────────
+    } else if (data === "\x1b[F" || data === "\x1b[4~" || data === "\x05") {
+      moveCursorTo(buffer.length);
+
+    // ── Ctrl+K: kill to end of line ────────────────────────────────────────
+    } else if (data === "\x0b") {
+      const erased = buffer.length - cursorPos;
+      buffer = buffer.slice(0, cursorPos);
+      for (let i = 0; i < erased; i++) term.write(" ");
+      for (let i = 0; i < erased; i++) term.write("\b");
+
+    // ── Ctrl+U: kill to start of line ─────────────────────────────────────
+    } else if (data === "\x15") {
+      const prefixLen = cursorPos;
+      const tail = buffer.slice(cursorPos);
+      // Move cursor to start of input
+      for (let i = 0; i < prefixLen; i++) term.write("\b");
+      // Write tail + spaces to erase old prefix, then move cursor all the way back
+      term.write(tail + " ".repeat(prefixLen));
+      for (let i = 0; i < tail.length + prefixLen; i++) term.write("\b");
+      buffer = tail;
       cursorPos = 0;
-      for (let i = 0; i < steps; i++) term.write("\x1b[D");
-    } else if (data === "\x1b[F" || data === "\x1b[4~") {
-      const steps = buffer.length - cursorPos;
-      cursorPos = buffer.length;
-      for (let i = 0; i < steps; i++) term.write("\x1b[C");
+
+    // ── Ctrl+W: delete word left ───────────────────────────────────────────
+    } else if (data === "\x17") {
+      const target = wordLeft(cursorPos);
+      const deleted = cursorPos - target;
+      buffer = buffer.slice(0, target) + buffer.slice(cursorPos);
+      for (let i = 0; i < deleted; i++) term.write("\b");
+      cursorPos = target;
+      redrawFromCursor();
+
+    // ── Alt+Backspace: delete word left (same as Ctrl+W) ───────────────────
+    } else if (data === "\x1b\x7f") {
+      const target = wordLeft(cursorPos);
+      const deleted = cursorPos - target;
+      buffer = buffer.slice(0, target) + buffer.slice(cursorPos);
+      for (let i = 0; i < deleted; i++) term.write("\b");
+      cursorPos = target;
+      redrawFromCursor();
+
+    // ── Ctrl+C ─────────────────────────────────────────────────────────────
     } else if (data === "\x03") {
       term.write("^C\r\n");
       sendLine("\x03");
       buffer = "";
       cursorPos = 0;
+      historyIndex = -1;
+      savedBuffer = "";
+
+    // ── Ctrl+D ─────────────────────────────────────────────────────────────
     } else if (data === "\x04") {
       sendLine("\x04");
+
+    // ── Ctrl+L: clear screen ───────────────────────────────────────────────
     } else if (data === "\x0c") {
       term.clear();
+
+    // ── Printable characters ───────────────────────────────────────────────
     } else if (code >= 32 || code === 9) {
       const head = buffer.slice(0, cursorPos);
       const tail = buffer.slice(cursorPos);
