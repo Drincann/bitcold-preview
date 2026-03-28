@@ -177,8 +177,8 @@ importers:
         specifier: workspace:*
         version: link:../../lib/db
       bitcold:
-        specifier: 0.5.0
-        version: 0.5.0(typescript@5.9.3)
+        specifier: 0.6.0
+        version: 0.6.0(typescript@5.9.3)
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
@@ -1845,8 +1845,8 @@ packages:
     resolution: {integrity: sha512-tlf/r2DGMbF7ky1MgUqXHzypYHakkEnm0SZP23CJKIqNY/5uNAnMbFhMJdhjrL/7anfb/U8+AlpdjPWjPnAalg==}
     engines: {node: '>=8.0.0'}
 
-  bitcold@0.5.0:
-    resolution: {integrity: sha512-abZfdE40KGPr2v+73XGrAv+IXi1YRVvqrRgJshpU7FiHhtYhWrOVFHXmZhGT1R5tjmMuMqw5XmzNgNF2LGVc3Q==}
+  bitcold@0.6.0:
+    resolution: {integrity: sha512-jSZPcXPZNhnGJZmBRKvrZThn2whgbQdygpHaBH/FGz8yLMt6QOtJMRS+QXGNW/HfQ9ARNAYLwDnrOFIl85qSUA==}
     hasBin: true
 
   body-parser@2.2.2:
@@ -4868,7 +4868,7 @@ snapshots:
       typeforce: 1.18.0
       varuint-bitcoin: 1.1.2
 
-  bitcold@0.5.0(typescript@5.9.3):
+  bitcold@0.6.0(typescript@5.9.3):
     dependencies:
       base-x: 5.0.1
       bech32: 2.0.0
@@ -4877,7 +4877,6 @@ snapshots:
       bitcoinjs-lib: 6.1.7
       commander: 12.1.0
       ecpair: 2.1.0
-      esbuild: 0.27.3
       prompts: 2.4.2
       qrcode: 1.5.4
       tiny-secp256k1: 2.2.4
