@@ -130,10 +130,21 @@ export function setupTerminalWebSocket(server: Server) {
     }
   });
 
-  wss.on("connection", (ws: WebSocket) => {
+  wss.on("connection", (ws: WebSocket, request: IncomingMessage) => {
     const sessionHome = createSessionHome();
+    const sessionId = path.basename(sessionHome);
     const shellPath = writeSessionShell(sessionHome);
-    logger.info({ sessionHome }, "Terminal WebSocket connected, restricted shell created");
+
+    // Extract client context for all log entries in this session
+    const ip =
+      (request.headers["x-forwarded-for"] as string | undefined)
+        ?.split(",")[0]
+        .trim() ?? request.socket.remoteAddress ?? "unknown";
+    const ua = request.headers["user-agent"] ?? "unknown";
+
+    const ctx = { sessionId, ip, ua };
+
+    logger.info(ctx, "session:connect");
 
     const cols = 80;
     const rows = 24;
@@ -160,7 +171,7 @@ export function setupTerminalWebSocket(server: Server) {
     });
 
     shell.onExit(({ exitCode }) => {
-      logger.info({ exitCode }, "Terminal process exited");
+      logger.info({ ...ctx, exitCode }, "session:exit");
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "exit", code: exitCode }));
         ws.close();
@@ -172,8 +183,14 @@ export function setupTerminalWebSocket(server: Server) {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "input") {
+          // Log command lines — strip trailing newline, skip bare control chars
+          const line = (msg.data as string).replace(/\n$/, "").trim();
+          if (line && !/^[\x00-\x1f]+$/.test(line)) {
+            logger.info({ ...ctx, cmd: line }, "session:cmd");
+          }
           shell.write(msg.data);
         } else if (msg.type === "resize") {
+          logger.info({ ...ctx, cols: msg.cols, rows: msg.rows }, "session:resize");
           shell.resize(msg.cols, msg.rows);
         }
       } catch {
@@ -182,13 +199,13 @@ export function setupTerminalWebSocket(server: Server) {
     });
 
     ws.on("close", () => {
-      logger.info("Terminal WebSocket disconnected");
+      logger.info(ctx, "session:disconnect");
       shell.kill();
       cleanupSessionHome(sessionHome);
     });
 
     ws.on("error", (err) => {
-      logger.error({ err }, "Terminal WebSocket error");
+      logger.error({ ...ctx, err }, "session:error");
       shell.kill();
       cleanupSessionHome(sessionHome);
     });
