@@ -146,6 +146,12 @@ export function setupTerminalWebSocket(server: Server) {
 
     logger.info(ctx, "session:connect");
 
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      }
+    }, 30_000);
+
     const cols = 80;
     const rows = 24;
 
@@ -199,12 +205,14 @@ export function setupTerminalWebSocket(server: Server) {
     });
 
     ws.on("close", () => {
+      clearInterval(pingInterval);
       logger.info(ctx, "session:disconnect");
       shell.kill();
       cleanupSessionHome(sessionHome);
     });
 
     ws.on("error", (err) => {
+      clearInterval(pingInterval);
       logger.error({ ...ctx, err }, "session:error");
       shell.kill();
       cleanupSessionHome(sessionHome);

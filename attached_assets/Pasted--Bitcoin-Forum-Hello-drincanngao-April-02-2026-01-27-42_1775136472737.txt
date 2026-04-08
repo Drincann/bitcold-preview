@@ -1,0 +1,321 @@
+
+Bitcoin Forum	
+Hello drincanngao	April 02, 2026, 01:27:42 PM *
+Show unread posts since last visit.
+Show new replies to your posts.
+Watchlist
+Total time logged in: 2 hours and 29 minutes.
+News: Latest Bitcoin Core release: 30.2 [Torrent]	
+ 
+  
+ 	 	Home	 	Help	Search	Profile	My Messages [1]	Members	More	Logout	 
+Bitcoin Forum > Bitcoin > Project Development (Moderator: Mitchell) > [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+Pages: [1]	
+« previous topic next topic »
+Reply  |  Unwatch  |  Notify  |  Mark unread  |  Print
+	Author	Topic: [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets  (Read 73 times)
+drincanngao (OP)
+Newbie
+*
+Online Online
+
+Activity: 2
+Merit: 1
+Posts: 2
+
+
+View Profile Email Personal Message (Online)
+	
+[ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+March 29, 2026, 05:42:33 PM
+Reply with quote Edit message Delete message  +Merit  #1
+bitcold — A Lightweight CLI for Bitcoin Cold Wallets
+
+Website: https://bitcold.dev
+GitHub: https://github.com/Drincann/bitcold
+npm: https://www.npmjs.com/package/bitcold
+License: WTFPL
+
+ 
+
+Why I Built This
+ 
+As a developer who holds Bitcoin, I spent a significant amount of time trying to find a proper tool for cold storage — something lightweight, transparent, and fully offline. I looked at many existing solutions, but none of them felt right. I decided to build it myself. bitcold is the tool I wished existed — minimal, auditable, standards-compliant, and designed to run on an air-gapped machine with nothing but Node.js.
+ 
+What is bitcold?
+ 
+bitcold is a lightweight, open-source command-line tool for generating Bitcoin cold wallets, managing HD keys, and signing transactions — all completely offline. It's designed for users who want full control of their keys without relying on GUI wallets or third-party services.
+ 
+No network requests. No external APIs. Just your keys, on your air-gapped machine like raspberry pi.
+ 
+Try It Now — Live in Your Browser
+ 
+You can try bitcold right now without installing anything. Visit https://bitcold.dev and click the terminal on the page — it will connect you to an isolated shell running on a Linux machine with the latest version of bitcold pre-installed. You can create wallets, derive addresses, and explore all commands directly from your browser.
+
+Key Features
+
+BIP39 Mnemonic Generation — Generate 12/15/18/21/24-word mnemonics, or supply your own entropy
+BIP84 Native SegWit (P2WPKH) — Derives bc1... addresses following the standard m/84'/0'/account'/change/index path
+HD Wallet with Multi-Account Support — Create multiple accounts under a single mnemonic, each with its own address space
+BIP39 Passphrase Support — Optional passphrase for an extra layer of security on top of your mnemonic
+Offline Transaction Signing — Build and sign raw transactions with specified UTXOs, output as hex or QR code
+AES-256-GCM Encrypted Storage — Wallet data is encrypted at rest using scrypt-derived keys (N=2^18, r=8, p=1)
+QR Code Output — Display signed transactions as QR codes for easy transfer to an online device
+Mainnet / Testnet / Regtest — Full support for all Bitcoin networks
+
+Quick Start
+
+Code:
+# Install
+npm install -g bitcold
+
+# Create a wallet
+bitcold wallet create
+
+# Show wallet info
+bitcold wallet show my-wallet
+
+# Derive a receive address
+bitcold receive my-wallet@account_0
+
+# Sign a transaction (offline)
+bitcold tx sign \
+  --from my-wallet@default:0 \
+  --to bc1qexampleaddress... \
+  --amount 50000 \
+  --fee 1000 \
+  --utxo txid:vout:amount
+
+How It Works
+
+1. Generate or import a BIP39 mnemonic on an air-gapped machine
+2. Derive addresses using standard BIP84 HD paths
+3. Receive bitcoin to your derived addresses (share via QR or copy)
+4. Sign transactions offline by providing UTXO details manually
+5. Broadcast the signed raw transaction from any online device
+
+All wallet data is encrypted with AES-256-GCM before being written to disk. The encryption key is derived from your CLI passphrase using scrypt.
+
+Security Model
+
+Zero network access — designed for air-gapped environments
+CLI-level passphrase encrypts all wallet data on disk
+Optional BIP39 passphrase adds a second layer of key derivation security
+Open source — audit the code yourself
+
+Technical Stack
+
+TypeScript / Node.js (ES Modules)
+bitcoinjs-lib, bip32, bip39, tiny-secp256k1
+No external API calls, no telemetry
+
+
+
+Feedback, questions, and code audits from the Bitcointalk technical community are highly appreciated!
+GitHub Issues: https://github.com/Drincann/bitcold/issues
+
+The project is currently in its early stage. Please be aware that the underlying APIs, command structures, and functionalities may change constantly as development continues.
+
+If you find this useful, feel free to star the repo. Thanks for checking it out.
+
+Report to moderator  
+DireWolfM14
+Copper Member
+Legendary
+*
+
+
+Activity: 2828
+Merit: 5625
+
+
+
+
+View Profile WWW Personal Message (Offline)
+
+Ignore
+	
+Re: [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+March 29, 2026, 10:31:39 PM
+Merited by hugeblack (2)
+Reply with quote  +Merit  #2
+Quote from: drincanngao on March 29, 2026, 05:42:33 PM
+BIP39 Mnemonic Generation — Generate 12/15/18/21/24-word mnemonics, or supply your own entropy
+
+I looked through the code, but I couldn't find what's used to generate entropy for the mnemonic.  Where and how is it generated if none is supplied?
+
+Quote from: drincanngao on March 29, 2026, 05:42:33 PM
+QR Code Output — Display signed transactions as QR codes for easy transfer to an online device
+
+I assume this needs a Desktop Environment to function, correct?
+
+Nice initiative, assuming the security is there.  I might fire up a VM to play with it later.
+Report to moderator  
+▄███████████████████████▄
+█████████▀▀███▀▀█████████
+████▀▀████▄▄█▄▄██████████
+██████▄███████████▀█▀████
+████████████████▀█▄▀█▄███
+████████▀█▀███▀█▄▀█▄█████
+███████▄█▀▄█▀█▄▀█▄███████
+██████▀██▄█▀▄▀█▄███▀█████
+███████▀███▄█▄████▀██████
+████████▀████████▀███████
+███████▄██▀▀█▀▀▀██▄██████
+█████████▄▄███▄▄█████████
+▀███████████████████████▀
+ 
+  AntiKYC.io  Discover no KYC crypto   📈 exchanges     🎰 casinos     🌐 hosting    and  🔒 VPN    built for privacy.  
+(BTC)
+Jr. Member
+*
+
+
+Activity: 42
+Merit: 54
+
+"Messages are broadcast on a best effort basis,"
+
+
+View Profile Personal Message (Offline)
+
+Ignore
+	
+Re: [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+March 30, 2026, 02:53:42 AM
+Reply with quote  +Merit  #3
+If this ends up being secure after various forum users test and greenlight it as safe to use, wouldn't it be super useful for those interested in making physical bitcoins/bitcoin collectibles?
+Report to moderator  
+BTC
+drincanngao (OP)
+Newbie
+*
+Online Online
+
+Activity: 2
+Merit: 1
+Posts: 2
+
+
+View Profile Email Personal Message (Online)
+	
+Re: [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+March 30, 2026, 06:55:39 AM
+Merited by DireWolfM14 (1)
+Reply with quote Edit message Delete message  +Merit  #4
+Thanks for looking into the code!
+
+Quote from: DireWolfM14 on March 29, 2026, 10:31:39 PM
+I looked through the code, but I couldn't find what's used to generate entropy for the mnemonic.  Where and how is it generated if none is supplied?
+
+Short answer: the default entropy is cryptographically secure — it's OpenSSL's CSPRNG seeded by the OS kernel.
+
+The call chain goes like this:
+
+bitcold mnemonic.mts → bip39 generateMnemonic() at index.js → @noble/hashes randomBytes() at utils.ts → crypto.getRandomValues() → Node.js ncrypto → OpenSSL RAND_bytes_ex() → OS kernel CSPRNG (getrandom() on Linux, BCryptGenRandom on Windows).
+ 
+So ultimately it's the OS kernel providing the entropy, same source that OpenSSH, GPG, etc. all rely on. Cryptographically secure for practical purposes.
+ 
+That said, if you'd rather not trust any software RNG at all, bitcold lets you supply your own entropy. For example you could roll dice — each roll gives ~2.585 bits (log₂6), so about 100 rolls with one die gets you 256 bits. Hash the result with SHA-256 and feed it in:
+ 
+Code:
+bitcold wallet create my-wallet -b 010100010111.....(256 bits)
+
+Quote from: DireWolfM14 on March 29, 2026, 10:31:39 PM
+I assume this needs a Desktop Environment to function, correct?
+
+Nope, no GUI or desktop environment needed at all! The QR codes are rendered as Unicode block characters directly in the terminal (using the qrcode library with type: 'terminal'). It works in any terminal emulator, including over SSH on a headless machine — which is exactly the kind of environment you'd expect for an air-gapped setup.
+
+Hope you find it useful!
+
+
+Quote from: (BTC) on March 30, 2026, 02:53:42 AM
+If this ends up being secure after various forum users test and greenlight it as safe to use, wouldn't it be super useful for those interested in making physical bitcoins/bitcoin collectibles?
+
+Good point, but I think the challenge would be hardware longevity though. Metal can corrode, devices can fail. Once you factor in disaster recovery you'd still want a mnemonic backup, and at that point it's not much different from a regular hardware wallet setup.
+
+[mod note: merged consecutive posts]
+
+Report to moderator  
+DireWolfM14
+Copper Member
+Legendary
+*
+
+
+Activity: 2828
+Merit: 5625
+
+
+
+
+View Profile WWW Personal Message (Offline)
+
+Ignore
+	
+Re: [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+March 30, 2026, 02:55:25 PM
+Reply with quote  +Merit  #5
+Quote from: drincanngao on March 30, 2026, 06:55:39 AM
+Thanks for looking into the code!
+
+I didn't spend too much time on it.  Hopefully I'll have more time to scrutinize it over the next week.
+
+
+Quote from: drincanngao on March 30, 2026, 06:55:39 AM
+Short answer: the default entropy is cryptographically secure — it's OpenSSL's CSPRNG seeded by the OS kernel.
+
+The call chain goes like this:
+
+bitcold mnemonic.mts → bip39 generateMnemonic() at index.js → @noble/hashes randomBytes() at utils.ts → crypto.getRandomValues() → Node.js ncrypto → OpenSSL RAND_bytes_ex() → OS kernel CSPRNG (getrandom() on Linux, BCryptGenRandom on Windows).
+ 
+So ultimately it's the OS kernel providing the entropy, same source that OpenSSH, GPG, etc. all rely on. Cryptographically secure for practical purposes.
+
+That sounds good.  My main concern is that I don't trust JS for entropy, and as far as I know it's only capable of 128 bit entropy which is insufficient for seed phrases over 12 words.
+
+Quote from: drincanngao on March 30, 2026, 06:55:39 AM
+That said, if you'd rather not trust any software RNG at all, bitcold lets you supply your own entropy. For example you could roll dice — each roll gives ~2.585 bits (log₂6), so about 100 rolls with one die gets you 256 bits. Hash the result with SHA-256 and feed it in:
+ 
+Code:
+bitcold wallet create my-wallet -b 010100010111.....(256 bits)
+
+Nah, dice rolls take too long and I do trust the Linux kernel RNG.  I use it to generate all my passwords using urandom commands.
+
+Quote from: drincanngao on March 30, 2026, 06:55:39 AM
+Quote from: DireWolfM14 on March 29, 2026, 10:31:39 PM
+I assume this needs a Desktop Environment to function, correct?
+
+Nope, no GUI or desktop environment needed at all! The QR codes are rendered as Unicode block characters directly in the terminal (using the qrcode library with type: 'terminal'). It works in any terminal emulator, including over SSH on a headless machine — which is exactly the kind of environment you'd expect for an air-gapped setup.
+
+Cool!  Now I'm looking forward to seeing it in action, lol.
+
+Quote from: drincanngao on March 30, 2026, 06:55:39 AM
+Hope you find it useful!
+
+Honestly, I probably won't use it for real world application but I am intrigued by the code.  I have hardware wallets that have capability such as this, and are obviously secure.  I can definitely see a use-case for people using it on an air-gapped computer in leu of a hardware wallet.  Assuming it proves secure safe, of course.
+Report to moderator  
+▄███████████████████████▄
+█████████▀▀███▀▀█████████
+████▀▀████▄▄█▄▄██████████
+██████▄███████████▀█▀████
+████████████████▀█▄▀█▄███
+████████▀█▀███▀█▄▀█▄█████
+███████▄█▀▄█▀█▄▀█▄███████
+██████▀██▄█▀▄▀█▄███▀█████
+███████▀███▄█▄████▀██████
+████████▀████████▀███████
+███████▄██▀▀█▀▀▀██▄██████
+█████████▄▄███▄▄█████████
+▀███████████████████████▀
+ 
+  AntiKYC.io  Discover no KYC crypto   📈 exchanges     🎰 casinos     🌐 hosting    and  🔒 VPN    built for privacy.  
+Pages: [1]	
+Reply  |  Unwatch  |  Notify  |  Add poll  |  Print
+Bitcoin Forum > Bitcoin > Project Development (Moderator: Mitchell) > [ANN] bitcold — Lightweight CLI for Bitcoin Cold Wallets
+« previous topic next topic »
+Move Topic  |  Lock topic
+Jump to: 
+=> Project Development
+  
+
+Powered by MySQL Powered by PHP	Powered by SMF 1.1.19 | SMF © 2006-2009, Simple Machines	Valid XHTML 1.0! Valid CSS!
